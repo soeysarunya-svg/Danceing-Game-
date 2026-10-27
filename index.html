@@ -1,0 +1,862 @@
+<title>Y2K Dance Floor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;600;700&family=Mitr:wght@400;600&display=swap">
+<style>
+/* Layout: one full-screen dance floor drawn on canvas; menus float over it as chrome-edged panels */
+:root{
+  --bg:#130a2c; --bg-deep:#0a0519; --panel:rgba(22,12,52,.86); --line:rgba(190,180,255,.28);
+  --ink:#f4f0ff; --muted:#b3a8d9;
+  --pink:#ff3ea5; --cyan:#4be3ff; --lime:#7dff6a; --lemon:#ffe14d; --violet:#8b5cff;
+  --display:'Bungee','Mitr',system-ui,sans-serif;
+  --thai:'Mitr','Chakra Petch',system-ui,sans-serif;
+  --body:'Chakra Petch','Mitr',system-ui,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;overflow:hidden}
+#app{position:relative;width:100%;height:100%;overflow:hidden}
+#stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.screen{position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;
+  padding-block:28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:linear-gradient(180deg,rgba(10,5,25,.55),rgba(10,5,25,.78))}
+.screen>*{margin-block:auto}
+.panel{width:min(100%,920px);background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  padding:clamp(18px,4vw,36px);box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 30px 80px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-family:var(--display);font-size:12px;letter-spacing:.18em;color:var(--cyan);margin:0}
+h1,h2,h3{margin:0;text-wrap:balance}
+h2{font-family:var(--thai);font-weight:600;font-size:clamp(22px,4vw,30px)}
+.logo{font-family:var(--display);font-weight:400;line-height:.92;font-size:clamp(44px,11vw,104px);
+  background:linear-gradient(180deg,#ffffff 0%,#d9e6ff 38%,#7f86b8 50%,#f2f6ff 62%,#b9c2ef 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 18px rgba(255,62,165,.55)) drop-shadow(3px 4px 0 var(--pink))}
+.lede{font-family:var(--thai);font-size:17px;line-height:1.6;color:var(--ink);max-width:56ch;margin:0}
+.muted{color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{font-family:var(--thai);font-size:17px;font-weight:600;color:var(--ink);background:rgba(255,255,255,.06);
+  border:1px solid var(--line);border-radius:999px;padding:12px 26px;cursor:pointer;transition:transform .12s,background .12s,border-color .12s}
+.btn:hover{background:rgba(255,255,255,.12);border-color:var(--cyan)}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.card:focus-visible,.level:focus-visible{outline:3px solid var(--lemon);outline-offset:3px}
+.btn.primary{background:linear-gradient(90deg,var(--pink),var(--violet));border-color:transparent;box-shadow:0 0 24px rgba(255,62,165,.45)}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.small{font-size:14px;padding:8px 16px}
+.keys{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px;color:var(--muted)}
+kbd{font-family:var(--body);font-weight:700;color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;padding:1px 7px}
+/* characters */
+.chars{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
+.card{width:158px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;color:var(--ink);font-family:var(--body);
+  background:rgba(255,255,255,.04);border:2px solid var(--line);border-radius:16px;padding:12px 10px 14px;cursor:pointer;transition:border-color .15s,transform .15s,background .15s}
+.card:hover{transform:translateY(-3px)}
+.card[aria-pressed="true"]{border-color:var(--pink);background:rgba(255,62,165,.12);box-shadow:0 0 22px rgba(255,62,165,.35)}
+.card canvas{width:120px;height:150px}
+.card b{font-family:var(--thai);font-size:20px;font-weight:600}
+.card .tag{font-family:var(--display);font-size:11px;letter-spacing:.08em;color:var(--cyan)}
+.card .perk{font-size:13px;color:var(--lemon);line-height:1.35;min-height:2.7em}
+/* levels */
+.levels{display:flex;flex-direction:column;gap:10px}
+.level{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:4px 16px;align-items:center;text-align:left;width:100%;
+  color:var(--ink);font-family:var(--body);background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:12px 16px;cursor:pointer;transition:background .15s,border-color .15s}
+.level:hover:not([disabled]){background:rgba(75,227,255,.1);border-color:var(--cyan)}
+.level[disabled]{opacity:.45;cursor:not-allowed}
+.level .num{font-family:var(--display);font-size:30px;color:var(--pink);grid-row:span 2;text-align:center}
+.level .t{font-family:var(--display);font-size:clamp(15px,2.6vw,20px);min-width:0;overflow-wrap:anywhere}
+.level .meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.level .side{grid-row:span 2;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.stars{color:var(--lemon);letter-spacing:2px;font-size:15px;white-space:nowrap}
+.best{font-family:var(--display);font-size:13px;color:var(--lime)}
+.diff{font-family:var(--thai);font-size:13px;padding:1px 10px;border-radius:999px;border:1px solid currentColor}
+/* hud */
+#pauseBtn{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(14px,env(safe-area-inset-right,0px));
+  width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(10,5,25,.6);color:var(--ink);font-family:var(--display);font-size:16px;cursor:pointer}
+/* result */
+.result{align-items:center;text-align:center;max-width:560px}
+.grade{font-family:var(--display);font-size:clamp(90px,22vw,150px);line-height:1;color:var(--lemon);text-shadow:0 0 30px rgba(255,225,77,.55),4px 5px 0 var(--pink)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;width:100%;margin:0}
+.stats div{background:rgba(255,255,255,.05);border-radius:12px;padding:10px}
+.stats dt{font-size:12px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.stats dd{margin:2px 0 0;font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.note{font-family:var(--thai);color:var(--lime);margin:0;min-height:1.4em}
+.howto{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.howto li{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5}
+.howto strong{display:block;font-family:var(--thai);font-weight:600;color:var(--cyan);margin-bottom:2px}
+@media (max-width:520px){.card{width:calc(50% - 8px)}.level{grid-template-columns:44px minmax(0,1fr)}.level .side{grid-row:auto;grid-column:2;flex-direction:row;align-items:center;gap:10px}.level .num{font-size:24px}}
+@media (prefers-reduced-motion:reduce){.btn,.card{transition:none}}
+</style>
+
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <section class="screen" id="s-title">
+    <div class="panel">
+      <p class="eyebrow">MILLENNIUM RHYTHM · 5 STAGES · 5 DANCERS</p>
+      <h1 class="logo">Y2K<br>DANCE FLOOR</h1>
+      <p class="lede">เกมเต้นตามจังหวะ เพลงแนวยุค 2000 ทั้ง 5 ด่าน ตั้งแต่ป๊อปสดใสไปจนถึงทรานซ์สุดมันส์ กดลูกศรให้ตรงจังหวะที่ลูกศรตกถึงเส้น แล้วพาดาวรุ่งของคุณขึ้นเวที</p>
+      <ul class="howto">
+        <li><strong>คีย์บอร์ด</strong><kbd>←</kbd> <kbd>↓</kbd> <kbd>↑</kbd> <kbd>→</kbd> หรือ <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd></li>
+        <li><strong>มือถือ / แท็บเล็ต</strong>แตะช่องลูกศรตอนโน้ตถึงเส้นด้านล่าง</li>
+        <li><strong>Fever ×2</strong>เก็บ Perfect ให้เกจเต็ม แล้วคะแนนคูณสองชั่วคราว</li>
+      </ul>
+      <div class="row">
+        <button class="btn primary" id="btnStart">เริ่มเต้น</button>
+        <span class="muted">กด <kbd>Esc</kbd> เพื่อหยุดเกม · เปิดเสียงด้วยนะ</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-chars" hidden>
+    <div class="panel">
+      <p class="eyebrow">STEP 1 · CHOOSE YOUR DANCER</p>
+      <h2>เลือกตัวละคร</h2>
+      <div class="chars" id="charList"></div>
+      <div class="row">
+        <button class="btn" id="charBack">กลับ</button>
+        <button class="btn primary" id="charNext">ไปเลือกด่าน</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-levels" hidden>
+    <div class="panel">
+      <p class="eyebrow">STEP 2 · PICK A TRACK</p>
+      <h2>เลือกด่าน <span class="muted" id="lvChar" style="font-size:.6em"></span></h2>
+      <div class="levels" id="levelList"></div>
+      <div class="row">
+        <button class="btn" id="lvBack">เปลี่ยนตัวละคร</button>
+        <button class="btn small" id="lvUnlock">ปลดล็อกทุกด่าน</button>
+      </div>
+      <p class="muted" style="margin:0;font-size:13px">ผ่านด่านด้วยพลังชีวิตที่เหลือเพื่อปลดล็อกด่านถัดไป เพลงทุกเพลงแต่งใหม่ในสไตล์ยุค 2000 และสังเคราะห์เสียงสดในเบราว์เซอร์</p>
+    </div>
+  </section>
+
+  <button id="pauseBtn" hidden aria-label="หยุดเกม">II</button>
+
+  <section class="screen" id="s-pause" hidden>
+    <div class="panel result">
+      <p class="eyebrow">PAUSED</p>
+      <h2>หยุดพักแป๊บ</h2>
+      <div class="row" style="justify-content:center">
+        <button class="btn primary" id="pResume">เต้นต่อ</button>
+        <button class="btn" id="pRestart">เริ่มเพลงใหม่</button>
+        <button class="btn" id="pQuit">ออกไปเลือกด่าน</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="s-result" hidden>
+    <div class="panel result">
+      <p class="eyebrow" id="rStatus">STAGE CLEAR</p>
+      <div class="grade" id="rGrade">A</div>
+      <h2 id="rSong"></h2>
+      <dl class="stats" id="rStats"></dl>
+      <p class="note" id="rNote"></p>
+      <div class="row" style="justify-content:center">
+        <button class="btn primary" id="rNext">ด่านต่อไป</button>
+        <button class="btn" id="rRetry">เล่นอีกครั้ง</button>
+        <button class="btn" id="rMenu">เลือกด่าน</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const cv = $('#stage'), c = cv.getContext('2d');
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------- save data ---------------- */
+const SAVE_KEY = 'y2kdance.v1';
+let SAVE = { unlocked: 1, best: {}, char: 0 };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) SAVE = Object.assign(SAVE, s); } catch (e) {}
+const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch (e) {} };
+
+/* ---------------- songs ---------------- */
+const SCALES = { major: [0,2,4,5,7,9,11], minor: [0,2,3,5,7,8,10] };
+const SONGS = [
+  { title:'Flip Phone Love', genre:'Bubblegum Pop', bpm:100, root:60, scale:'major', prog:[0,5,3,4], style:'pop', seed:11,
+    diff:'ง่าย', col:'#7dff6a', stars:1, speed:430, hpLoss:10,
+    chart:{ maxPrio:2, s8:false, s16:false, minGap:4, maxRun:0, jump:0 } },
+  { title:'Low-Rise Groove', genre:'R&B / Hip-Hop', bpm:92, root:57, scale:'minor', prog:[0,5,2,6], style:'rnb', seed:23,
+    diff:'ปานกลาง', col:'#4be3ff', stars:2, speed:480, hpLoss:9,
+    chart:{ maxPrio:2, s8:true, s16:false, minGap:2, maxRun:0, jump:0 } },
+  { title:'Y2K Summer Crush', genre:'Teen Pop', bpm:118, root:62, scale:'major', prog:[0,4,5,3], style:'teen', seed:37,
+    diff:'ค่อนข้างยาก', col:'#ffe14d', stars:3, speed:560, hpLoss:8,
+    chart:{ maxPrio:3, s8:true, s16:false, minGap:2, maxRun:0, jump:0.1 } },
+  { title:'Club Millennium', genre:'Eurodance', bpm:132, root:53, scale:'minor', prog:[0,5,6,4], style:'euro', seed:41,
+    diff:'ยาก', col:'#ff9a3c', stars:4, speed:640, hpLoss:7,
+    chart:{ maxPrio:3, s8:true, s16:true, all16:false, minGap:1, maxRun:2, jump:0.12 } },
+  { title:'Disc 2 Overdrive', genre:'Trance', bpm:142, root:55, scale:'minor', prog:[0,5,2,6], style:'trance', seed:59,
+    diff:'โหดสุด', col:'#ff3ea5', stars:5, speed:720, hpLoss:6,
+    chart:{ maxPrio:3, s8:true, s16:true, all16:true, minGap:1, maxRun:3, jump:0.18 } },
+];
+const eighths = [0,2,4,6,8,10,12,14];
+const STYLES = {
+  pop:   { kick:[0,8,10], snare:[4,12], clap:[], hat:eighths, ohat:[14],
+           bass:[[0,0,2],[3,0,2],[6,12,2],[8,0,2],[11,0,2],[14,7,2]], bassWave:'square', bassCut:700,
+           chords:[{ inst:'pad', steps:[[0,16]] }], leadWave:'square', dens:.85, s16:.04 },
+  rnb:   { kick:[0,7,10], snare:[], clap:[4,12], hat:[0,2,3,4,6,8,10,11,12,14], ohat:[],
+           bass:[[0,0,3],[7,0,2],[10,7,3],[14,10,2]], bassWave:'sawtooth', bassCut:420,
+           chords:[{ inst:'keys', steps:[[0,6],[6,4],[10,6]] }], leadWave:'triangle', dens:.8, s16:.12 },
+  teen:  { kick:[0,6,8], snare:[4,12], clap:[12], hat:eighths, ohat:[6,14],
+           bass:eighths.map(x => [x, x===6||x===14 ? 12 : 0, 2]), bassWave:'square', bassCut:600,
+           chords:[{ inst:'pluck', steps:eighths.map(x => [x,2]) }], leadWave:'square', dens:.95, s16:.06 },
+  euro:  { kick:[0,4,8,12], snare:[], clap:[4,12], hat:[0,4,8,12], ohat:[2,6,10,14],
+           bass:[[2,12,2],[6,12,2],[10,12,2],[14,12,2]], bassWave:'sawtooth', bassCut:900,
+           chords:[{ inst:'stab', steps:[[0,2],[3,2],[6,2],[10,2],[12,2]] }, { inst:'pad', steps:[[0,16]], only:['break','intro'] }],
+           leadWave:'sawtooth', dens:1, s16:.18 },
+  trance:{ kick:[0,4,8,12], snare:[], clap:[4,12], hat:[...Array(16).keys()], ohat:[2,6,10,14],
+           bass:[...Array(16).keys()].filter(x => x%4).map(x => [x,0,1]), bassWave:'sawtooth', bassCut:650,
+           chords:[{ inst:'pad', steps:[[0,16]] }, { inst:'stab', steps:[[2,1],[6,1],[10,1],[14,1]], only:['chorus'] }],
+           leadWave:'sawtooth', dens:1, s16:.3 },
+};
+const FORM = [['intro',4],['verse',8],['chorus',8],['break',4],['verse',8],['chorus',8],['outro',4]];
+
+function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function degToMidi(song, d){ const sc = SCALES[song.scale]; return song.root + 12 * Math.floor(d / 7) + sc[((d % 7) + 7) % 7]; }
+
+function motif(rng, dens, s16){
+  const notes = []; let off = 2;
+  for (let i = 0; i < 32; i++){
+    const p = i % 4 === 0 ? .72 : i % 2 === 0 ? .42 : s16;
+    if (rng() < p * dens){
+      if (i % 4 === 0) off = [0,2,4,7][Math.floor(rng() * 4)];
+      else off += rng() < .5 ? 1 : -1;
+      off = Math.max(-2, Math.min(7, off));
+      notes.push({ s:i, off, len:1 });
+    }
+  }
+  notes.forEach((n, k) => { n.len = Math.min(4, (k + 1 < notes.length ? notes[k+1].s : 32) - n.s); });
+  return notes;
+}
+
+const songCache = {};
+function buildSong(idx){
+  if (songCache[idx]) return songCache[idx];
+  const song = SONGS[idx], st = STYLES[song.style], rng = mulberry(song.seed);
+  const ev = []; let sec = 'intro';
+  const add = (s, i, o) => ev.push(Object.assign({ s, i, v:1, sec }, o));
+  const mA = motif(rng, st.dens * .8, st.s16), mA2 = motif(rng, st.dens * .8, st.s16);
+  const mB = motif(rng, st.dens, st.s16 * 1.5), mB2 = motif(rng, st.dens, st.s16 * 1.5);
+  const mC = motif(rng, st.dens * .5, 0);
+  sec = 'count'; for (let k = -4; k < 0; k++) add(k * 4, 'tick');
+  let bar = 0;
+  for (const [name, len] of FORM){
+    sec = name;
+    for (let b = 0; b < len; b++, bar++){
+      const S = bar * 16, cd = song.prog[bar % 4], last = b === len - 1;
+      const full = sec === 'verse' || sec === 'chorus';
+      if (sec !== 'break' && !(sec === 'outro' && last)) st.kick.forEach(x => add(S + x, 'kick'));
+      if (full || (sec === 'intro' && b >= 2) || (sec === 'outro' && !last)){
+        st.snare.forEach(x => add(S + x, 'snare')); st.clap.forEach(x => add(S + x, 'clap'));
+      }
+      if (sec === 'break' && b >= 2) for (let x = 0; x < 16; x += (last ? 1 : 2)) add(S + x, 'snare', { v:.35 + .65 * x / 16 });
+      if (!(sec === 'outro' && last)) st.hat.forEach(x => add(S + x, 'hat', { v: x % 4 === 0 ? 1 : .7 }));
+      if (sec === 'chorus') st.ohat.forEach(x => add(S + x, 'ohat'));
+      if (full && b === 0) add(S, 'crash');
+      if (sec === 'outro' && last){ add(S, 'crash'); add(S, 'kick'); }
+      if (full || (sec === 'outro' && !last) || (sec === 'intro' && b >= 2))
+        st.bass.forEach(([x, semi, l]) => add(S + x, 'bass', { m: degToMidi(song, cd) - 24 + semi, len:l, w:st.bassWave, cut:st.bassCut }));
+      const ms = [0,2,4].map(k => degToMidi(song, cd + k));
+      st.chords.forEach(part => {
+        if (part.only && !part.only.includes(sec)) return;
+        part.steps.forEach(([x, l]) => add(S + x, part.inst, { ms, len:l }));
+      });
+      let mot = null, shift = 0;
+      if (sec === 'verse') mot = b % 8 >= 6 ? mA2 : mA;
+      if (sec === 'chorus'){ mot = b % 8 >= 6 ? mB2 : mB; shift = 2; }
+      if (sec === 'break') mot = mC;
+      if (mot){
+        const half = b % 2;
+        mot.forEach(n => {
+          if (Math.floor(n.s / 16) !== half) return;
+          let m = degToMidi(song, cd + n.off + shift);
+          while (m > 84) m -= 12; while (m < 64) m += 12;
+          add(S + n.s % 16, 'lead', { m, len:n.len, w:st.leadWave });
+        });
+      }
+    }
+  }
+  ev.sort((a, b) => a.s - b.s);
+  return songCache[idx] = { events: ev, totalSteps: bar * 16, stepDur: 60 / song.bpm / 4 };
+}
+
+const PRIO = { lead:1, kick:2, snare:2, clap:2, bass:3 };
+function buildChart(idx){
+  const song = SONGS[idx], cfg = song.chart, built = buildSong(idx), rng = mulberry(song.seed * 7 + 3);
+  const by = new Map();
+  for (const e of built.events){
+    const p = PRIO[e.i]; if (!p || e.s < 16) continue;
+    const cur = by.get(e.s); if (!cur || p < cur.p) by.set(e.s, { p, i:e.i, sec:e.sec });
+  }
+  const steps = [...by.keys()].sort((a, b) => a - b);
+  const notes = []; let last = -99, run = 0, lastLane = -1, rep = 0;
+  for (const s of steps){
+    const k = by.get(s);
+    if (k.p > cfg.maxPrio) continue;
+    if (s % 2 === 1){ if (!cfg.s16 || (!cfg.all16 && k.sec !== 'chorus')) continue; }
+    else if (s % 4 === 2 && !cfg.s8) continue;
+    const gap = s - last;
+    if (gap < cfg.minGap) continue;
+    if (gap === 1 && run + 1 > cfg.maxRun) continue;
+    run = gap === 1 ? run + 1 : 0;
+    let lane;
+    if (k.i === 'kick') lane = rng() < .5 ? 0 : 3;
+    else if (k.i === 'snare' || k.i === 'clap') lane = rng() < .5 ? 1 : 2;
+    else lane = Math.floor(rng() * 4);
+    if (lane === lastLane){ rep++; if (rep >= 2 || gap === 1){ lane = (lane + 1 + Math.floor(rng() * 3)) % 4; rep = 0; } }
+    else rep = 0;
+    const t = s * built.stepDur;
+    notes.push({ t, lane });
+    if (cfg.jump && s % 4 === 0 && gap >= 2 && rng() < cfg.jump)
+      notes.push({ t, lane: (lane + 1 + Math.floor(rng() * 3)) % 4, jump:true });
+    lastLane = lane; last = s;
+  }
+  return notes;
+}
+
+/* ---------------- audio ---------------- */
+let actx = null, MASTER = null, NOISE = null;
+function ensureAudio(){
+  if (actx){ if (actx.state === 'suspended' && !G.paused) actx.resume(); return; }
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = actx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+  MASTER = actx.createGain(); MASTER.gain.value = .8;
+  comp.connect(MASTER).connect(actx.destination);
+  MASTER.input = comp;
+  NOISE = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+  const d = NOISE.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function env(g, t, a, peak, dec){ g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + dec); }
+function noiseHit(t, type, freq, peak, dec, q){
+  const s = actx.createBufferSource(); s.buffer = NOISE;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
+  const g = actx.createGain(); env(g, t, .001, peak, dec);
+  s.connect(f).connect(g).connect(G.bus); s.start(t); s.stop(t + dec + .05);
+}
+function tone(t, wave, freq, peak, a, dec, cut, detune){
+  const o = actx.createOscillator(); o.type = wave; o.frequency.value = freq; if (detune) o.detune.value = detune;
+  const g = actx.createGain(); env(g, t, a, peak, dec);
+  let n = o;
+  if (cut){ const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; o.connect(f); n = f; }
+  n.connect(g).connect(G.bus); o.start(t); o.stop(t + a + dec + .05);
+}
+function playEv(e, t){
+  const v = e.v, dur = (e.len || 1) * G.stepDur;
+  switch (e.i){
+    case 'kick': {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + .13);
+      env(g, t, .002, .95 * v, .32); o.connect(g).connect(G.bus); o.start(t); o.stop(t + .4); break; }
+    case 'snare': noiseHit(t, 'highpass', 1800, .42 * v, .16); tone(t, 'triangle', 185, .28 * v, .001, .09); break;
+    case 'clap': noiseHit(t, 'bandpass', 1300, .55 * v, .14, .8); noiseHit(t + .012, 'bandpass', 1300, .35 * v, .1, .8); break;
+    case 'hat': noiseHit(t, 'highpass', 8000, .15 * v, .035); break;
+    case 'ohat': noiseHit(t, 'highpass', 7000, .12 * v, .22); break;
+    case 'crash': noiseHit(t, 'highpass', 4500, .2 * v, 1.4); break;
+    case 'tick': tone(t, 'square', 1760, .07, .001, .05); break;
+    case 'bass': tone(t, e.w, mtof(e.m), .3 * v, .005, dur * .95, e.cut); break;
+    case 'lead': tone(t, e.w, mtof(e.m), (e.w === 'triangle' ? .16 : .075) * v, .01, Math.max(.12, dur * .9), 3200); break;
+    case 'pad':
+      e.ms.forEach(m => [-7, 7].forEach(dt => {
+        const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = dt;
+        const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1500;
+        const g = actx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.022, t + .15);
+        g.gain.setValueAtTime(.022, t + dur - .1); g.gain.linearRampToValueAtTime(0, t + dur + .2);
+        o.connect(f).connect(g).connect(G.bus); o.start(t); o.stop(t + dur + .25);
+      })); break;
+    case 'keys': e.ms.forEach(m => { tone(t, 'triangle', mtof(m), .09, .004, dur * .9 + .2); tone(t, 'sine', mtof(m + 12), .025, .004, dur * .6); }); break;
+    case 'pluck': e.ms.forEach(m => tone(t, 'square', mtof(m), .03, .002, .18, 2200)); break;
+    case 'stab': e.ms.forEach(m => tone(t, 'sawtooth', mtof(m + 12), .045, .003, .16, 2800)); break;
+  }
+}
+
+/* ---------------- characters ---------------- */
+const P = o => Object.assign({ la:[-.25,-.1], ra:[.25,.1], ll:[-.1,-.05], rl:[.1,.05], lean:0, y:0, head:0 }, o);
+const mirror = p => ({ la:[-p.ra[0],-p.ra[1]], ra:[-p.la[0],-p.la[1]], ll:[-p.rl[0],-p.rl[1]], rl:[-p.ll[0],-p.ll[1]], lean:-p.lean, y:p.y, head:-p.head });
+const lerpPose = (a, b, k) => {
+  const L = (x, y) => x + (y - x) * k, A = (x, y) => [L(x[0], y[0]), L(x[1], y[1])];
+  return { la:A(a.la,b.la), ra:A(a.ra,b.ra), ll:A(a.ll,b.ll), rl:A(a.rl,b.rl), lean:L(a.lean,b.lean), y:L(a.y,b.y), head:L(a.head,b.head) };
+};
+const HIT = [
+  P({ la:[-1.6,-1.6], ra:[.7,-.9], ll:[-.45,-.2], rl:[.08,.05], lean:-.12 }),
+  P({ la:[-.5,.5], ra:[.5,-.5], ll:[-.55,.25], rl:[.55,-.25], y:12 }),
+  P({ la:[-2.7,-2.95], ra:[2.7,2.95], ll:[-.15,-.05], rl:[.15,.05], y:-10 }),
+];
+HIT[3] = mirror(HIT[0]);
+const MISS = P({ la:[-.15,.1], ra:[.15,-.1], lean:.22, y:6, head:.5 });
+const popA = P({ la:[-.5,-1.2], ra:[.3,.15], lean:-.08, ll:[-.2,-.05], rl:[.05,.1] }), popC = P({ la:[-2.5,-2.8], ra:[.35,.2], lean:.05 });
+const bbA = P({ la:[-.9,-2.1], ra:[.8,1.7], ll:[-.5,-.1], rl:[.1,.15], y:5, lean:.05 });
+const emoA = P({ la:[-.3,-.5], ra:[.3,.5], lean:.12, y:4, head:.45 }), emoB = P({ lean:-.04, head:-.15, la:[-.2,.2], ra:[.2,-.2] });
+const rvA = P({ la:[-.7,-2.3], ra:[.4,.3], ll:[-.45,-.25], rl:[.05,.35], y:2 }), rvC = P({ la:[-2.8,-3], ra:[.6,1.2], ll:[-.1,0], rl:[.3,.1] });
+const cuA = P({ la:[-2.3,-2.9], ra:[2.3,2.9], y:-6 }), cuB = P({ la:[-.6,-3.6], ra:[.6,3.6], y:3, head:.2 });
+
+const CHARS = [
+  { name:'ไอซ์', tag:'POP PRINCESS', perk:'คะแนนทุกโน้ต +10%', skin:'#f6c9a8', hair:'#ffe08a', hairStyle:'long',
+    top:'#ff5fb8', pants:'#5b8fd9', shoe:'#ffffff', extra:'crop', moves:[popA, mirror(popA), popC, mirror(popC)], mod:{ score:1.1 } },
+  { name:'บอส', tag:'B-BOY', perk:'ช่วง Perfect / Great กว้างขึ้น 15%', skin:'#c98d62', hair:'#1b1b1b', hairStyle:'cap', cap:'#e53935',
+    top:'#ffb300', pants:'#3a3f4b', shoe:'#f5f5f5', extra:'jersey', moves:[bbA, mirror(bbA)], mod:{ win:1.15 } },
+  { name:'มายด์', tag:'EMO KID', perk:'พลังชีวิตสูงสุด 130', skin:'#f3d7c6', hair:'#16121f', hairStyle:'fringe',
+    top:'#2a2438', pants:'#3b2d5c', shoe:'#d32f2f', extra:'stripes', moves:[emoA, emoB], mod:{ hp:130 } },
+  { name:'ต้า', tag:'RAVER', perk:'เกจ Fever ชาร์จเร็วขึ้น 50%', skin:'#e0a982', hair:'#4be3ff', hairStyle:'spiky',
+    top:'#7dff6a', pants:'#6c3bd1', shoe:'#ff9a3c', extra:'goggles', moves:[rvA, mirror(rvA), rvC, mirror(rvC)], mod:{ fever:1.5 } },
+  { name:'ปิ่น', tag:'KAWAII IDOL', perk:'กันคอมโบหลุดได้ 3 ครั้งต่อเพลง', skin:'#f8d5c0', hair:'#ff8fc8', hairStyle:'pigtails',
+    top:'#ffffff', pants:'#e0457b', shoe:'#7a4cff', extra:'skirt', moves:[cuA, cuB], mod:{ shield:3 } },
+];
+
+const ease = k => k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+function getPose(ch, beat, act){
+  const seq = CHARS[ch].moves, b = Math.floor(beat), f = beat - b, n = seq.length;
+  let p = lerpPose(seq[((b % n) + n) % n], seq[(((b + 1) % n) + n) % n], ease(f));
+  p.y += -Math.abs(Math.sin(beat * Math.PI)) * 5;
+  if (act && act.k > 0) p = lerpPose(p, act.pose, act.k);
+  return p;
+}
+const pt = (o, a, l) => ({ x: o.x + Math.sin(a) * l, y: o.y + Math.cos(a) * l });
+function seg(g, a, b, w, col){ g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
+
+function drawDancer(g, x, y, s, ch, pose, sad){
+  const C = CHARS[ch];
+  g.save(); g.translate(x, y); g.scale(s, s); g.lineCap = 'round'; g.lineJoin = 'round';
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(0, 2, 34, 7, 0, 0, Math.PI * 2); g.fill();
+  const hip = { x:0, y:-72 + pose.y };
+  const neck = { x: Math.sin(pose.lean) * 56, y: hip.y - Math.cos(pose.lean) * 56 };
+  const head = { x: neck.x + Math.sin(pose.lean + pose.head * .5) * 19, y: neck.y - Math.cos(pose.lean + pose.head * .5) * 19 };
+  const lh = { x:-7, y:hip.y }, rh = { x:7, y:hip.y };
+  const lk = pt(lh, pose.ll[0], 36), lf = pt(lk, pose.ll[1], 36), rk = pt(rh, pose.rl[0], 36), rf = pt(rk, pose.rl[1], 36);
+  const ls = { x:neck.x - 14, y:neck.y + 4 }, rs = { x:neck.x + 14, y:neck.y + 4 };
+  const le = pt(ls, pose.la[0], 29), lw = pt(le, pose.la[1], 27), re = pt(rs, pose.ra[0], 29), rw = pt(re, pose.ra[1], 27);
+  // back hair
+  if (C.hairStyle === 'long'){ g.fillStyle = C.hair; g.beginPath(); g.roundRect(head.x - 18, head.y - 14, 36, 52, 14); g.fill(); }
+  // legs
+  const legCol = C.extra === 'skirt' ? C.skin : C.pants, legW = C.extra === 'skirt' ? 9 : 14;
+  [[lh,lk,lf],[rh,rk,rf]].forEach(([h,k,f]) => { seg(g, h, k, legW, legCol); seg(g, k, f, legW - 1, legCol); });
+  if (C.extra === 'skirt') [[lk,lf],[rk,rf]].forEach(([k,f]) => seg(g, { x:(k.x+f.x)/2, y:(k.y+f.y)/2 }, f, 10, '#ffffff'));
+  g.fillStyle = C.shoe; [lf, rf].forEach(f => { g.beginPath(); g.ellipse(f.x, f.y + 2, 10, 5.5, 0, 0, Math.PI * 2); g.fill(); });
+  // torso
+  const torso = () => { g.beginPath(); g.moveTo(ls.x - 2, ls.y - 2); g.lineTo(rs.x + 2, rs.y - 2); g.lineTo(hip.x + 12, hip.y + 4); g.lineTo(hip.x - 12, hip.y + 4); g.closePath(); };
+  g.fillStyle = C.skin; torso(); g.fill();
+  g.save(); torso(); g.clip();
+  g.fillStyle = C.top;
+  const topEnd = C.extra === 'crop' ? .62 : 1.1;
+  g.fillRect(neck.x - 40, neck.y - 10, 80, (hip.y - neck.y) * topEnd + 10);
+  if (C.extra === 'crop'){ g.fillStyle = C.pants; g.fillRect(hip.x - 40, hip.y - 6, 80, 14); }
+  if (C.extra === 'stripes'){ g.fillStyle = '#d32f2f'; for (let k = 0; k < 4; k++) g.fillRect(neck.x - 40, neck.y + 10 + k * 12, 80, 4); }
+  if (C.extra === 'jersey'){ g.fillStyle = '#1b1b1b'; g.font = '20px Bungee, sans-serif'; g.textAlign = 'center'; g.fillText('00', (neck.x + hip.x) / 2, (neck.y + hip.y) / 2 + 8); }
+  if (C.extra === 'goggles'){ g.fillStyle = '#ff3ea5'; g.fillRect(neck.x - 40, (neck.y + hip.y) / 2, 80, 6); }
+  g.restore();
+  if (C.extra === 'jersey'){ g.strokeStyle = '#ffd54f'; g.lineWidth = 2.5; g.beginPath(); g.arc(neck.x, neck.y + 6, 10, .2, Math.PI - .2); g.stroke(); }
+  if (C.extra === 'skirt'){ g.fillStyle = C.pants; g.beginPath(); g.moveTo(hip.x - 13, hip.y - 4); g.lineTo(hip.x + 13, hip.y - 4); g.lineTo(hip.x + 22, hip.y + 22); g.lineTo(hip.x - 22, hip.y + 22); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.5; for (let k = -1; k <= 1; k++){ g.beginPath(); g.moveTo(hip.x + k * 8, hip.y - 4); g.lineTo(hip.x + k * 14, hip.y + 22); g.stroke(); } }
+  // arms
+  const sleeve = C.extra === 'crop' || C.extra === 'goggles' ? C.skin : C.top;
+  [[ls,le,lw],[rs,re,rw]].forEach(([sh,el,wr]) => { seg(g, sh, el, 11, sleeve); seg(g, el, wr, 9, C.skin); g.fillStyle = C.skin; g.beginPath(); g.arc(wr.x, wr.y, 6, 0, Math.PI * 2); g.fill(); });
+  // neck + head
+  seg(g, neck, { x:(neck.x + head.x) / 2, y:(neck.y + head.y) / 2 }, 8, C.skin);
+  g.fillStyle = C.skin; g.beginPath(); g.arc(head.x, head.y, 15, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1a1030';
+  [-5, 5].forEach(dx => { g.beginPath(); g.arc(head.x + dx, head.y + 1, 2, 0, Math.PI * 2); g.fill(); });
+  g.strokeStyle = '#1a1030'; g.lineWidth = 1.8; g.beginPath();
+  if (sad) g.arc(head.x, head.y + 10, 4, Math.PI + .3, -.3); else g.arc(head.x, head.y + 5, 4, .3, Math.PI - .3);
+  g.stroke();
+  // hair front
+  const hx = head.x, hy = head.y; g.fillStyle = C.hair;
+  switch (C.hairStyle){
+    case 'long': g.beginPath(); g.arc(hx, hy - 2, 16.5, Math.PI * 1.02, -.02); g.fill(); break;
+    case 'cap':
+      g.fillStyle = C.cap; g.beginPath(); g.arc(hx, hy - 3, 16.5, Math.PI, 0); g.fill();
+      g.fillRect(hx - 17, hy - 5, 34, 4); g.beginPath(); g.roundRect(hx + 8, hy - 19, 16, 6, 3); g.fill(); break;
+    case 'fringe':
+      g.beginPath(); g.arc(hx, hy - 2, 16.5, Math.PI, 0); g.fill();
+      g.beginPath(); g.moveTo(hx - 17, hy - 4); g.lineTo(hx + 16, hy - 12); g.lineTo(hx + 15, hy + 8); g.lineTo(hx + 2, hy + 2); g.closePath(); g.fill(); break;
+    case 'spiky':
+      g.beginPath(); g.moveTo(hx - 16, hy - 2);
+      for (let k = 0; k <= 5; k++){ const a = Math.PI + k * Math.PI / 5; g.lineTo(hx + Math.cos(a - .3) * 15, hy - 2 + Math.sin(a - .3) * 15); g.lineTo(hx + Math.cos(a) * 27, hy - 4 + Math.sin(a) * 25); }
+      g.lineTo(hx + 16, hy - 2); g.closePath(); g.fill(); break;
+    case 'pigtails':
+      [-1, 1].forEach(sd => { g.beginPath(); g.ellipse(hx + sd * 21, hy + 4, 7, 13, sd * .3, 0, Math.PI * 2); g.fill(); });
+      g.beginPath(); g.arc(hx, hy - 2, 16.5, Math.PI, 0); g.fill();
+      g.fillStyle = '#7a4cff'; [-1, 1].forEach(sd => { g.beginPath(); g.arc(hx + sd * 16, hy - 6, 3.5, 0, Math.PI * 2); g.fill(); }); break;
+  }
+  if (C.extra === 'goggles'){
+    g.fillStyle = '#ff3ea5'; g.fillRect(hx - 17, hy - 10, 34, 4);
+    g.fillStyle = 'rgba(255,225,77,.85)'; [-6.5, 6.5].forEach(dx => { g.beginPath(); g.ellipse(hx + dx, hy - 8, 6, 4.5, 0, 0, Math.PI * 2); g.fill(); });
+  }
+  if (C.extra === 'crop'){ g.fillStyle = '#ffe14d'; star(g, hx + 13, hy - 14, 5); }
+  g.restore();
+}
+function star(g, x, y, r){ g.beginPath(); for (let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
+
+/* ---------------- game state ---------------- */
+const LANE_COL = ['#ff3ea5', '#4be3ff', '#7dff6a', '#ffe14d'];
+const LANE_ROT = [-Math.PI / 2, Math.PI, 0, Math.PI / 2];
+const KEYMAP = { ArrowLeft:0, ArrowDown:1, ArrowUp:2, ArrowRight:3, KeyD:0, KeyF:1, KeyJ:2, KeyK:3 };
+const G = { screen:'title', char: Math.min(SAVE.char || 0, 4), level:0, playing:false, paused:false, bus:null };
+let W = 0, H = 0, DPR = 1;
+
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+}
+window.addEventListener('resize', resize); resize();
+
+function layout(){
+  const wide = W >= 760;
+  const laneW = wide ? Math.min(88, (W * .5 - 60) / 4) : Math.min(84, (W - 40) / 4);
+  const lanesX = wide ? W * .5 + (W * .5 - laneW * 4) / 2 - 10 : (W - laneW * 4) / 2;
+  const recY = H - Math.max(96, H * .15);
+  return { wide, laneW, lanesX, recY };
+}
+
+function songNow(){ return actx.currentTime - G.t0 - (actx.outputLatency || actx.baseLatency || 0); }
+
+function startGame(lv){
+  ensureAudio();
+  if (actx.state === 'suspended') actx.resume();
+  stopSong();
+  const song = SONGS[lv], built = buildSong(lv), mod = CHARS[G.char].mod;
+  Object.assign(G, {
+    level:lv, events:built.events, totalSteps:built.totalSteps, stepDur:built.stepDur,
+    notes:buildChart(lv), head:0, evIdx:0, t0: actx.currentTime + .35 + 16 * built.stepDur,
+    score:0, combo:0, maxCombo:0, counts:{ perfect:0, great:0, good:0, miss:0 },
+    hpMax: mod.hp || 100, hp: mod.hp || 100, fever:0, feverUntil:-1, shield: mod.shield || 0,
+    win: { perfect:.045 * (mod.win || 1), great:.09 * (mod.win || 1), good:.135 },
+    judge:null, press:[-9,-9,-9,-9], parts:[], act:null, missAt:-9, playing:true, paused:false, ended:false,
+  });
+  G.bus = actx.createGain(); G.bus.connect(MASTER.input);
+  clearInterval(G.timer); G.timer = setInterval(scheduler, 25);
+  show(null); $('#pauseBtn').hidden = false;
+  G.screen = 'game';
+}
+function scheduler(){
+  if (!G.playing || G.paused) return;
+  const horizon = actx.currentTime + .15;
+  while (G.evIdx < G.events.length){
+    const e = G.events[G.evIdx], t = G.t0 + e.s * G.stepDur;
+    if (t > horizon) break;
+    if (t >= actx.currentTime - .02) playEv(e, Math.max(t, actx.currentTime));
+    G.evIdx++;
+  }
+}
+function stopSong(){
+  clearInterval(G.timer);
+  if (G.bus){ const b = G.bus; b.gain.setTargetAtTime(0, actx.currentTime, .05); setTimeout(() => b.disconnect(), 400); G.bus = null; }
+  G.playing = false;
+}
+
+function hit(lane){
+  if (!G.playing || G.paused || G.ended) return;
+  const now = songNow();
+  G.press[lane] = performance.now();
+  let best = null, bd = 9;
+  for (let i = G.head; i < G.notes.length; i++){
+    const n = G.notes[i];
+    if (n.t - now > G.win.good) break;
+    if (n.done || n.lane !== lane) continue;
+    const d = Math.abs(n.t - now);
+    if (d <= G.win.good && d < bd){ best = n; bd = d; }
+  }
+  if (!best) return;
+  best.done = true;
+  const kind = bd <= G.win.perfect ? 'perfect' : bd <= G.win.great ? 'great' : 'good';
+  const mod = CHARS[G.char].mod;
+  G.counts[kind]++; G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
+  const base = { perfect:300, great:200, good:100 }[kind];
+  const feverOn = now < G.feverUntil;
+  G.score += Math.round(base * (1 + Math.min(G.combo, 50) * .02) * (feverOn ? 2 : 1) * (mod.score || 1));
+  G.hp = Math.min(G.hpMax, G.hp + { perfect:2, great:1, good:0 }[kind]);
+  if (!feverOn){
+    G.fever += { perfect:4, great:2.5, good:.8 }[kind] * (mod.fever || 1);
+    if (G.fever >= 100){ G.fever = 0; G.feverUntil = now + 32 * G.stepDur * 2; G.judge = { text:'FEVER ×2', col:'#ff3ea5', at:performance.now(), big:true }; }
+  }
+  if (!(G.judge && G.judge.big && performance.now() - G.judge.at < 600))
+    G.judge = { text:kind.toUpperCase(), col:{ perfect:'#ffe14d', great:'#7dff6a', good:'#4be3ff' }[kind], at:performance.now() };
+  G.act = { lane, at:performance.now() };
+  burst(lane, kind === 'perfect' ? 16 : 9);
+}
+function miss(n){
+  n.done = true; G.counts.miss++;
+  if (G.shield > 0 && G.combo > 0){ G.shield--; G.judge = { text:'SAVE!', col:'#ff8fc8', at:performance.now() }; }
+  else { G.combo = 0; G.judge = { text:'MISS', col:'#ff5a5a', at:performance.now() }; }
+  G.hp -= SONGS[G.level].hpLoss; G.missAt = performance.now();
+  if (G.hp <= 0){ G.hp = 0; finish(false); }
+}
+function burst(lane, n){
+  const L = layout(), x = L.lanesX + L.laneW * (lane + .5);
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 260;
+    G.parts.push({ x, y:L.recY, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp - 80, life:1, col:LANE_COL[lane] });
+  }
+}
+
+function finish(cleared){
+  if (G.ended) return;
+  G.ended = true; stopSong(); $('#pauseBtn').hidden = true;
+  const total = G.notes.length, ct = G.counts;
+  const acc = total ? (ct.perfect * 300 + ct.great * 200 + ct.good * 100) / (total * 300) : 0;
+  let grade = acc >= .95 ? 'S' : acc >= .88 ? 'A' : acc >= .78 ? 'B' : acc >= .65 ? 'C' : 'D';
+  if (!cleared) grade = 'F';
+  const lv = G.level, song = SONGS[lv];
+  const notes = [];
+  if (cleared && lv + 2 > SAVE.unlocked && lv < 4){ SAVE.unlocked = lv + 2; notes.push(`ปลดล็อกด่าน ${lv + 2}: ${SONGS[lv + 1].title}`); }
+  const prev = SAVE.best[lv];
+  if (cleared && (!prev || G.score > prev.score)){ SAVE.best[lv] = { score:G.score, grade }; if (prev) notes.push('ทำคะแนนสูงสุดใหม่!'); }
+  if (cleared && lv === 4) notes.push('ผ่านครบทุกด่าน คุณคือราชาฟลอร์ยุค 2000!');
+  save();
+  $('#rStatus').textContent = cleared ? 'STAGE CLEAR' : 'STAGE FAILED';
+  $('#rGrade').textContent = grade;
+  $('#rSong').textContent = `ด่าน ${lv + 1} · ${song.title}`;
+  $('#rStats').innerHTML = [
+    ['Score', G.score.toLocaleString()], ['Accuracy', (acc * 100).toFixed(1) + '%'], ['Max combo', G.maxCombo],
+    ['Perfect', ct.perfect], ['Great', ct.great], ['Good', ct.good], ['Miss', ct.miss],
+  ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  $('#rNote').textContent = cleared ? notes.join(' · ') : 'พลังชีวิตหมดก่อนจบเพลง ลองอีกครั้งนะ';
+  $('#rNext').hidden = !(cleared && lv < 4);
+  setTimeout(() => { show('#s-result'); G.screen = 'result'; }, cleared ? 300 : 900);
+}
+
+function pause(){
+  if (G.screen !== 'game' || G.ended || G.paused) return;
+  G.paused = true; actx.suspend(); show('#s-pause'); $('#pauseBtn').hidden = true;
+}
+function resume(){
+  if (!G.paused) return;
+  G.paused = false; actx.resume(); show(null); $('#pauseBtn').hidden = false;
+}
+
+/* ---------------- input ---------------- */
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape'){ if (G.screen === 'game') (G.paused ? resume : pause)(); return; }
+  const lane = KEYMAP[e.code];
+  if (lane === undefined || G.screen !== 'game') return;
+  e.preventDefault();
+  if (!e.repeat) hit(lane);
+});
+cv.addEventListener('pointerdown', e => {
+  if (G.screen !== 'game') return;
+  const L = layout(), r = cv.getBoundingClientRect(), x = e.clientX - r.left;
+  const lane = Math.floor((x - L.lanesX) / L.laneW);
+  if (lane >= 0 && lane < 4){ e.preventDefault(); hit(lane); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+/* ---------------- menus ---------------- */
+const SCREENS = ['#s-title', '#s-chars', '#s-levels', '#s-pause', '#s-result'];
+function show(id){ SCREENS.forEach(s => { $(s).hidden = s !== id; }); }
+
+const charList = $('#charList'), previews = [];
+CHARS.forEach((ch, i) => {
+  const b = document.createElement('button');
+  b.className = 'card'; b.type = 'button'; b.id = 'char-' + i;
+  b.innerHTML = `<canvas width="240" height="300"></canvas><b>${ch.name}</b><span class="tag">${ch.tag}</span><span class="perk">${ch.perk}</span>`;
+  b.addEventListener('click', () => { G.char = i; SAVE.char = i; save(); markChar(); });
+  charList.appendChild(b); previews.push(b.querySelector('canvas'));
+});
+function markChar(){ [...charList.children].forEach((b, i) => b.setAttribute('aria-pressed', i === G.char)); }
+markChar();
+
+function renderLevels(){
+  $('#lvChar').textContent = `· เต้นโดย ${CHARS[G.char].name}`;
+  const list = $('#levelList'); list.innerHTML = '';
+  SONGS.forEach((s, i) => {
+    const locked = i + 1 > SAVE.unlocked, best = SAVE.best[i];
+    const b = document.createElement('button');
+    b.className = 'level'; b.type = 'button'; b.id = 'level-' + i; b.disabled = locked;
+    b.innerHTML = `<span class="num">${locked ? '🔒' : i + 1}</span>
+      <span class="t">${s.title}</span>
+      <span class="side"><span class="stars" aria-label="${s.stars} ดาว">${'★'.repeat(s.stars)}${'☆'.repeat(5 - s.stars)}</span>
+        <span class="best">${best ? `BEST ${best.grade} · ${best.score.toLocaleString()}` : locked ? '' : 'ยังไม่เคยเล่น'}</span></span>
+      <span class="meta">${s.genre} · ${s.bpm} BPM · <span class="diff" style="color:${s.col}">${s.diff}</span> · ${buildChart(i).length} โน้ต</span>`;
+    b.addEventListener('click', () => startGame(i));
+    list.appendChild(b);
+  });
+}
+
+$('#btnStart').onclick = () => { ensureAudio(); show('#s-chars'); G.screen = 'chars'; };
+$('#charBack').onclick = () => { show('#s-title'); G.screen = 'title'; };
+$('#charNext').onclick = () => { renderLevels(); show('#s-levels'); G.screen = 'levels'; };
+$('#lvBack').onclick = () => { show('#s-chars'); G.screen = 'chars'; };
+$('#lvUnlock').onclick = () => { SAVE.unlocked = 5; save(); renderLevels(); };
+$('#pauseBtn').onclick = pause;
+$('#pResume').onclick = resume;
+$('#pRestart').onclick = () => { G.paused = false; actx.resume(); startGame(G.level); };
+$('#pQuit').onclick = () => { G.paused = false; actx.resume(); stopSong(); G.ended = true; renderLevels(); show('#s-levels'); G.screen = 'levels'; };
+$('#rRetry').onclick = () => startGame(G.level);
+$('#rNext').onclick = () => startGame(G.level + 1);
+$('#rMenu').onclick = () => { renderLevels(); show('#s-levels'); G.screen = 'levels'; };
+
+/* ---------------- rendering ---------------- */
+function arrow(g, x, y, s, rot, fill, stroke, lw){
+  g.save(); g.translate(x, y); g.rotate(rot);
+  g.beginPath();
+  g.moveTo(0, -s); g.lineTo(s, 0); g.lineTo(s * .42, 0); g.lineTo(s * .42, s * .9);
+  g.lineTo(-s * .42, s * .9); g.lineTo(-s * .42, 0); g.lineTo(-s, 0); g.closePath();
+  if (fill){ g.fillStyle = fill; g.fill(); }
+  if (stroke){ g.strokeStyle = stroke; g.lineWidth = lw || 3; g.lineJoin = 'round'; g.stroke(); }
+  g.restore();
+}
+
+function drawStage(t, beat, fever){
+  const bg = c.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0a0519'); bg.addColorStop(.7, fever ? '#3a0c4a' : '#24104e'); bg.addColorStop(1, '#130a2c');
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  const pulse = Math.pow(1 - (((beat % 1) + 1) % 1), 3);
+  const floorY = H * .7;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const beamCols = ['255,62,165', '75,227,255', '139,92,255', '255,225,77'];
+  for (let i = 0; i < 4; i++){
+    const bx = W * (.12 + .25 * i), ang = REDUCED ? (i - 1.5) * .15 : Math.sin(t * .55 + i * 1.7) * .38;
+    c.save(); c.translate(bx, -10); c.rotate(ang);
+    const gr = c.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, `rgba(${beamCols[i]},${.22 + pulse * .12})`); gr.addColorStop(1, `rgba(${beamCols[i]},0)`);
+    c.fillStyle = gr; c.beginPath(); c.moveTo(-6, 0); c.lineTo(6, 0); c.lineTo(W * .1, H * 1.1); c.lineTo(-W * .1, H * 1.1); c.closePath(); c.fill();
+    c.restore();
+  }
+  c.restore();
+  c.fillStyle = 'rgba(8,4,22,.65)'; c.fillRect(0, floorY, W, H - floorY);
+  c.strokeStyle = `rgba(75,227,255,${.16 + pulse * .25})`; c.lineWidth = 1;
+  for (let k = 1; k <= 9; k++){ const y = floorY + (H - floorY) * Math.pow(k / 9, 2); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  const vx = W / 2, vy = floorY - H * .25;
+  for (let k = -10; k <= 10; k++){
+    const bx = W / 2 + k * W * .09, f = (floorY - vy) / (H - vy);
+    c.beginPath(); c.moveTo(vx + (bx - vx) * f, floorY); c.lineTo(bx, H); c.stroke();
+  }
+  // disco ball
+  const dbx = W * .5, dby = Math.min(70, H * .09);
+  c.strokeStyle = 'rgba(200,200,255,.3)'; c.beginPath(); c.moveTo(dbx, 0); c.lineTo(dbx, dby - 16); c.stroke();
+  const dg = c.createRadialGradient(dbx - 5, dby - 6, 2, dbx, dby, 18);
+  dg.addColorStop(0, '#ffffff'); dg.addColorStop(1, '#6b6f9e');
+  c.fillStyle = dg; c.beginPath(); c.arc(dbx, dby, 16, 0, Math.PI * 2); c.fill();
+}
+
+function drawDancerOnStage(beat, tnow){
+  const L = layout();
+  let act = null, sad = false;
+  if (G.screen === 'game' && G.act){
+    const dt = (tnow - G.act.at) / 1000;
+    act = { pose:HIT[G.act.lane], k: dt < .1 ? 1 : Math.max(0, 1 - (dt - .1) / .3) };
+  }
+  if (G.screen === 'game' && tnow - G.missAt < 350 && (!act || act.k === 0)){ act = { pose:MISS, k:1 - (tnow - G.missAt) / 350 }; sad = true; }
+  const pose = getPose(G.char, beat, act);
+  if (L.wide){
+    const s = Math.min(2.6, H / 300);
+    drawDancer(c, W * .26, H * .86, s, G.char, pose, sad);
+  } else {
+    c.save(); c.globalAlpha = G.screen === 'game' ? .4 : 1;
+    drawDancer(c, W / 2, H * .8, Math.min(2.2, H / 360), G.char, pose, sad);
+    c.restore();
+  }
+}
+
+function drawGame(now, tnow){
+  const L = layout(), { laneW, lanesX, recY } = L, pps = SONGS[G.level].speed * (H / 760);
+  const fever = now < G.feverUntil;
+  c.fillStyle = fever ? 'rgba(60,8,50,.55)' : 'rgba(8,4,22,.55)';
+  c.fillRect(lanesX, 0, laneW * 4, H);
+  c.strokeStyle = 'rgba(190,180,255,.14)'; c.lineWidth = 1;
+  for (let i = 0; i <= 4; i++){ c.beginPath(); c.moveTo(lanesX + i * laneW, 0); c.lineTo(lanesX + i * laneW, H); c.stroke(); }
+  // beat lines
+  const beatDur = 4 * G.stepDur;
+  for (let k = Math.max(0, Math.floor(now / beatDur)); ; k++){
+    const y = recY - (k * beatDur - now) * pps; if (y < 0) break;
+    c.strokeStyle = k % 4 === 0 ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)';
+    c.beginPath(); c.moveTo(lanesX, y); c.lineTo(lanesX + laneW * 4, y); c.stroke();
+  }
+  // receptors
+  const as = laneW * .36;
+  for (let i = 0; i < 4; i++){
+    const x = lanesX + laneW * (i + .5), pf = Math.max(0, 1 - (tnow - G.press[i]) / 140);
+    if (pf > 0){ c.fillStyle = `rgba(255,255,255,${pf * .12})`; c.fillRect(lanesX + laneW * i, 0, laneW, recY); }
+    arrow(c, x, recY, as * (1 + pf * .12), LANE_ROT[i], pf > 0 ? LANE_COL[i] + '88' : 'rgba(255,255,255,.06)', 'rgba(255,255,255,.75)', 2.5);
+  }
+  // notes
+  while (G.head < G.notes.length && G.notes[G.head].done) G.head++;
+  for (let i = G.head; i < G.notes.length; i++){
+    const n = G.notes[i];
+    if (n.done) continue;
+    const y = recY - (n.t - now) * pps;
+    if (y < -laneW) break;
+    arrow(c, lanesX + laneW * (n.lane + .5), y, as, LANE_ROT[n.lane], LANE_COL[n.lane], n.jump ? '#ffffff' : 'rgba(20,10,46,.9)', n.jump ? 4 : 3);
+  }
+  // particles
+  const dt = 1 / 60;
+  G.parts = G.parts.filter(p => (p.life -= dt * 1.8) > 0);
+  G.parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; c.globalAlpha = p.life; c.fillStyle = p.col; c.fillRect(p.x - 3, p.y - 3, 6, 6); });
+  c.globalAlpha = 1;
+  // combo + judgement
+  const cx = lanesX + laneW * 2;
+  c.textAlign = 'center';
+  if (G.combo >= 5){
+    c.fillStyle = 'rgba(255,255,255,.92)'; c.font = `${Math.round(laneW * .62)}px Bungee, sans-serif`;
+    c.fillText(G.combo, cx, H * .36);
+    c.font = '13px Bungee, sans-serif'; c.fillStyle = '#4be3ff'; c.fillText('COMBO', cx, H * .36 + 20);
+  }
+  if (G.judge){
+    const age = (tnow - G.judge.at) / 1000;
+    if (age < .6){
+      const sc = 1 + Math.max(0, .15 - age) * 2;
+      c.save(); c.translate(cx, H * .5); c.scale(sc, sc); c.globalAlpha = 1 - Math.max(0, age - .35) / .25;
+      c.font = `${G.judge.big ? 30 : 26}px Bungee, sans-serif`; c.fillStyle = G.judge.col;
+      c.shadowColor = G.judge.col; c.shadowBlur = 16; c.fillText(G.judge.text, 0, 0); c.restore();
+    }
+  }
+  // count-in
+  if (now < 0){
+    const left = Math.ceil(-now / beatDur);
+    c.font = `${Math.round(Math.min(W, H) * .16)}px Bungee, sans-serif`; c.fillStyle = '#ffe14d';
+    c.fillText(left > 3 ? 'READY' : left, cx, H * .42);
+  }
+  // fever gauge
+  const gx = lanesX + laneW * 4 + 8, gh = Math.min(220, recY * .5);
+  if (gx + 10 < W){
+    c.fillStyle = 'rgba(255,255,255,.1)'; c.fillRect(gx, recY - gh, 8, gh);
+    const fv = fever ? (G.feverUntil - now) / (64 * G.stepDur) : G.fever / 100;
+    c.fillStyle = fever ? '#ff3ea5' : '#8b5cff'; c.fillRect(gx, recY - gh * fv, 8, gh * fv);
+  }
+  // HUD
+  const songLen = G.totalSteps * G.stepDur;
+  c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(0, 0, W, 4);
+  c.fillStyle = '#4be3ff'; c.fillRect(0, 0, W * Math.max(0, Math.min(1, now / songLen)), 4);
+  c.textAlign = 'left'; c.fillStyle = '#f4f0ff';
+  c.font = '600 14px "Chakra Petch", sans-serif';
+  c.fillText(`ด่าน ${G.level + 1} · ${SONGS[G.level].title}`, 16, 28);
+  c.font = '22px Bungee, sans-serif'; c.fillStyle = fever ? '#ff3ea5' : '#ffe14d';
+  c.fillText(G.score.toLocaleString() + (fever ? '  ×2' : ''), 16, 56);
+  const hw = Math.min(260, W - 100), hpk = G.hp / G.hpMax;
+  c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(16, 66, hw, 9);
+  c.fillStyle = hpk > .5 ? '#7dff6a' : hpk > .25 ? '#ffe14d' : '#ff5a5a'; c.fillRect(16, 66, hw * hpk, 9);
+  if (G.shield > 0){ c.font = '600 12px "Chakra Petch", sans-serif'; c.fillStyle = '#ff8fc8'; c.fillText(`กันคอมโบ ×${G.shield}`, 16, 92); }
+  if (now > songLen + .8) finish(true);
+  // misses
+  for (let i = G.head; i < G.notes.length && !G.ended; i++){
+    const n = G.notes[i];
+    if (n.t > now - G.win.good) break;
+    if (!n.done){ miss(n); if (G.ended) break; }
+  }
+}
+
+function frame(tms){
+  const t = tms / 1000;
+  let beat = t * (108 / 60), now = 0, fever = false;
+  const inGame = (G.screen === 'game' || G.screen === 'result') && actx && G.notes;
+  if (inGame && G.screen === 'game'){ now = songNow(); beat = now / (4 * G.stepDur); fever = now < G.feverUntil; }
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawStage(t, beat, fever);
+  drawDancerOnStage(beat, tms);
+  if (G.screen === 'game') drawGame(now, tms);
+  if (G.screen === 'chars'){
+    previews.forEach((pc, i) => {
+      const g = pc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, pc.width, pc.height);
+      drawDancer(g, pc.width / 2, pc.height - 18, 1.75, i, getPose(i, beat + i * .25, null), false);
+    });
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
